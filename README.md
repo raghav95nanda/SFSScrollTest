@@ -1,1 +1,2 @@
-Test for SFS Scroll interaction
+Test for SFS Scroll interaction.
+Hopefully, it works
