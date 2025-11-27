@@ -1,230 +1,267 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>Scrollable Ladder Climber</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ladder Climb Animation</title>
+    
+    <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.5/dist/dotlottie-wc.js" type="module"></script>
 
-  <!-- DotLottie Web Component Loader -->
-  <script src="https://unpkg.com/@lottiefiles/dotlottie-wc@0.8.5/dist/dotlottie-wc.js" type="module"></script>
+    <style>
+        body {
+            height: 500vh;
+            margin: 0;
+            background-color: #f4f4f4;
+            font-family: sans-serif;
+            overflow-x: hidden;
+        }
 
-  <style>
-    body {
-      margin: 0;
-      font-family: system-ui;
-      background: #f5f5f5;
-    }
+        .instructions {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            z-index: 100;
+            max-width: 250px;
+        }
 
-    .spacer {
-      height: 200vh;
-    }
+        .stage-container {
+            position: fixed;
+            top: 50%;
+            //left: 50%;
+	    right: 0;
+            //transform: translate(-50%, -50%);
+	    transform: translateY(-50%);
+            height: 80vh;
+            width: 200px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-end;
+        }
 
-    .ladder-section {
-      position: relative;
-      height: 100vh;
-    }
+        /* --- LADDER (Thin Pattern) --- */
+        .ladder-bg {
+            height: 100%;
+            width: 30px; /* Thin ladder */
+            position: absolute;
+            bottom: 0;
+            z-index: 1;
+            background: repeating-linear-gradient(
+                to bottom,
+                #666 0,
+                #666 4px,         /* Rung thickness */
+                transparent 4px,
+                transparent 30px  /* Rung spacing */
+            );
+            border-left: 3px solid #666;
+            border-right: 3px solid #666;
+        }
 
-    .ladder-wrapper {
-      position: sticky;
-      top: 0;
-      height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: flex-end;
-      padding-right: 40px;
-      box-sizing: border-box;
-    }
+        /* --- CHARACTER (Larger & Overlapping) --- */
+        #character {
+            /* Made larger (60px) to overlap the 30px ladder */
+            width: 180px; 
+            height: auto; 
+            
+            position: absolute;
+            bottom: 0;
+            z-index: 10;
+            
+            left: 50%;
+            margin-left: -90px; /* Centered (half of 60px) */
+            
+            will-change: transform;
+        }
 
-    .ladder-inner {
-      position: relative;
-      width: 220px;
-      height: 520px;
-    }
+        /* FIX FOR SQUISHING:
+           Allow it to fill the container naturally.
+        */
+        dotlottie-wc {
+            width: 100%;
+            height: auto;
+            display: none;
+        }
 
-    .ladder-graphic {
-      position: absolute;
-      inset: 0;
-    }
+        dotlottie-wc.active {
+            display: block;
+        }
 
-    .ladder-graphic svg {
-      width: 100%;
-      height: 100%;
-      display: block;
-    }
-
-    .character {
-      position: absolute;
-      right: -40px;
-      bottom: 0;
-      width: 110px;
-      height: 110px;
-      transform: translateY(0);
-      pointer-events: none;
-    }
-
-    dotlottie-wc {
-      position: absolute;
-      width: 110px;
-      height: 110px;
-      opacity: 0;
-      transition: opacity 0.15s ease-out;
-    }
-
-    .active {
-      opacity: 1;
-    }
-  </style>
+        .falling {
+            transition: transform 4s linear;
+        }
+    </style>
 </head>
-
 <body>
 
-  <div class="spacer"></div>
-
-  <section class="ladder-section">
-    <div class="ladder-wrapper">
-      <div class="ladder-inner">
-
-        <!-- LADDER SVG DYNAMICALLY LOADED -->
-        <div class="ladder-graphic" id="ladderGraphic"></div>
-
-        <!-- CHARACTER ANIMATIONS -->
-        <div class="character" id="character">
-          <dotlottie-wc id="idleAnim"
-            src="https://lottie.host/13145c5f-8acc-4ea9-8842-58a458ef5553/b1W7KoG3lt.lottie"
-            loop autoplay></dotlottie-wc>
-
-          <dotlottie-wc id="climbAnim"
-            src="https://lottie.host/97e44afd-2200-44a5-8d60-8db614c54362/cqzrUWVWdo.lottie"
-            loop autoplay></dotlottie-wc>
-
-          <dotlottie-wc id="jumpAnim"
-            src="https://lottie.host/5fc8dea4-e109-4c3b-813d-afd4da96973b/fdslVCb92l.lottie">
-          </dotlottie-wc>
-        </div>
-
-      </div>
+    <div class="instructions">
+        <h3>Controls</h3>
+        <p>👇 <strong>Scroll Down</strong> to climb.</p>
+        <p>✋ <strong>Stop</strong> to jump off.</p>
+        <p>🏆 <strong>Reach Top</strong> to jump off.</p>
+        <p id="status" style="font-size: 12px; color: #666; margin-top: 10px;">Loading...</p>
     </div>
-  </section>
 
-  <div class="spacer"></div>
+    <div class="stage-container" id="stage">
+        <div class="ladder-bg" id="ladder"></div>
+        
+        <div id="character">
+            <!-- 
+                 CRITICAL FIX: 
+                 Using fit="contain" ensures aspect ratio is preserved.
+                 Added mode="normal" for standard playback.
+            -->
+            
+            <!-- IDLE -->
+            <dotlottie-wc 
+                id="anim-idle" 
+                class="active"
+                src="https://lottie.host/13145c5f-8acc-4ea9-8842-58a458ef5553/b1W7KoG3lt.lottie" 
+                autoplay 
+                loop
+                fit="contain">
+            </dotlottie-wc>
 
-  <script>
-    /* ---------------------------------------------
-       LOAD LADDER SVG FROM GITHUB RAW URL
-    --------------------------------------------- */
-    fetch("https://raw.githubusercontent.com/raghav95nanda/SFSScrollTest/refs/heads/main/Ladder%202.svg")
-      .then(r => r.text())
-      .then(svgText => {
-        document.getElementById("ladderGraphic").innerHTML = svgText;
-      });
+            <!-- CLIMB -->
+            <dotlottie-wc 
+                id="anim-climb" 
+                src="https://lottie.host/97e44afd-2200-44a5-8d60-8db614c54362/cqzrUWVWdo.lottie" 
+		autoplay
+                loop
+                fit="contain">
+            </dotlottie-wc>
 
+            <!-- JUMP -->
+            <dotlottie-wc 
+                id="anim-jump" 
+                src="https://lottie.host/5fc8dea4-e109-4c3b-813d-afd4da96973b/fdslVCb92l.lottie"
+		autoplay
+                fit="contain">
+            </dotlottie-wc>
+        </div>
+    </div>
 
-    /* ---------------------------------------------
-       SCROLL LOGIC (unchanged from earlier version)
-    --------------------------------------------- */
-    let state = "idle";
-    let climbProgress = 0;
-    let currentOffset = 0;
-    let ladderHeight = 400;
+    <script type="module">
+        const CLIMB_SPEED = 0.6;
+        const STOP_DELAY = 700;
+        const LADDER_OFFSET_TOP = 60; 
 
-    const characterEl = document.getElementById("character");
-    const idleEl = document.getElementById("idleAnim");
-    const climbEl = document.getElementById("climbAnim");
-    const jumpEl  = document.getElementById("jumpAnim");
+        let currentY = 0;
+        let ladderHeight = 0;
+        let isFalling = false;
+        let scrollTimeout;
+        let lastScrollY = window.scrollY;
+        let activeState = 'idle';
 
-    let lastScroll = window.scrollY;
-    let jumpStart = 0;
-    const jumpDuration = 2000;
-    let jumpFrame = null;
+        const charEl = document.getElementById('character');
+        const ladderEl = document.getElementById('ladder');
+        const elIdle = document.getElementById('anim-idle');
+        const elClimb = document.getElementById('anim-climb');
+        const elJump = document.getElementById('anim-jump');
+        const statusEl = document.getElementById('status');
 
-    function setState(newState) {
-      if (state === newState) return;
-      state = newState;
-
-      idleEl.classList.remove("active");
-      climbEl.classList.remove("active");
-      jumpEl .classList.remove("active");
-
-      if (newState === "idle") idleEl.classList.add("active");
-      if (newState === "climbing") climbEl.classList.add("active");
-      if (newState === "jumping") jumpEl.classList.add("active");
-
-      if (newState === "jumping" && typeof jumpEl.seek === "function") {
-        jumpEl.seek(0);
-      }
-    }
-
-    function updatePos() {
-      currentOffset = climbProgress * ladderHeight;
-      characterEl.style.transform = `translateY(-${currentOffset}px)`;
-    }
-
-    function startJump() {
-      setState("jumping");
-
-      const startOffset = currentOffset;
-      jumpStart = performance.now();
-
-      function tick() {
-        if (state !== "jumping") return;
-
-        let t = (performance.now() - jumpStart) / jumpDuration;
-        t = Math.min(Math.max(t, 0), 1);
-
-        const y = startOffset * (1 - t);
-        characterEl.style.transform = `translateY(-${y}px)`;
-        currentOffset = y;
-
-        if (t < 1) {
-          jumpFrame = requestAnimationFrame(tick);
-        } else {
-          climbProgress = 0;
-          currentOffset = 0;
-          updatePos();
-          setState("idle");
+        function updateDimensions() {
+            ladderHeight = ladderEl.clientHeight;
         }
-      }
 
-      if (jumpFrame) cancelAnimationFrame(jumpFrame);
-      jumpFrame = requestAnimationFrame(tick);
-    }
+        function switchAnimation(newState) {
+            if (activeState === newState) return;
+            
+            activeState = newState;
 
-    window.addEventListener("scroll", () => {
-      const current = window.scrollY;
-      const delta = current - lastScroll;
-      lastScroll = current;
+            elIdle.classList.remove('active');
+            elClimb.classList.remove('active');
+            elJump.classList.remove('active');
 
-      if (Math.abs(delta) < 1) return;
+            try { elIdle.pause(); } catch(e){}
+            try { elClimb.pause(); } catch(e){}
 
-      if (state === "jumping") {
-        if (jumpFrame) cancelAnimationFrame(jumpFrame);
-        climbProgress = ladderHeight ? currentOffset / ladderHeight : 0;
-        setState("climbing");
-      }
+            if (newState === 'idle') {
+                elIdle.classList.add('active');
+                try { elIdle.play(); } catch(e){}
+            } 
+            else if (newState === 'climbing') {
+                elClimb.classList.add('active');
+                try { elClimb.play(); } catch(e){}
+            } 
+            else if (newState === 'jumping') {
+                elJump.classList.add('active');
+                try { 
+                    elJump.seek(0);
+                    elJump.play(); 
+                } catch(e){}
+            }
+        }
 
-      climbProgress += delta * 0.0006;
-      climbProgress = Math.max(0, Math.min(1, climbProgress));
+        function startFall() {
+            if (currentY <= 0) return;
 
-      updatePos();
+            isFalling = true;
+            statusEl.textContent = "Jumping!";
+            
+            switchAnimation('jumping');
+            
+            charEl.classList.add('falling');
+            charEl.style.transform = `translateY(0px)`;
+            currentY = 0;
 
-      if (climbProgress >= 1) {
-        startJump();
-      } else {
-        setState("climbing");
-      }
+            charEl.addEventListener('transitionend', () => {
+                if(!isFalling) return;
+                isFalling = false;
+                charEl.classList.remove('falling');
+                switchAnimation('idle');
+                statusEl.textContent = "Idle";
+            }, { once: true });
+        }
 
-      clearTimeout(window._idleTimeout);
-      window._idleTimeout = setTimeout(() => {
-        if (state === "climbing" && climbProgress < 1) setState("idle");
-      }, 150);
-    });
+        customElements.whenDefined('dotlottie-wc').then(() => {
+            statusEl.textContent = "Ready!";
+            updateDimensions();
+            window.addEventListener('resize', updateDimensions);
 
-    window.addEventListener("load", () => {
-      const rect = document.querySelector(".ladder-inner").getBoundingClientRect();
-      ladderHeight = rect.height * 0.8;
-      updatePos();
-      setState("idle");
-    });
-  </script>
+            window.addEventListener('scroll', () => {
+                const nowScroll = window.scrollY;
+                const delta = Math.abs(nowScroll - lastScrollY);
+                lastScrollY = nowScroll;
 
+                if (delta < 1) return;
+
+                if (isFalling) {
+                    isFalling = false;
+                    const style = window.getComputedStyle(charEl);
+                    const matrix = new (window.DOMMatrix || window.WebKitCSSMatrix)(style.transform);
+                    currentY = Math.abs(matrix.m42);
+                    charEl.classList.remove('falling');
+                    charEl.style.transform = `translateY(-${currentY}px)`;
+                    statusEl.textContent = "Caught!";
+                }
+
+                currentY += (delta * CLIMB_SPEED);
+
+                if (currentY >= ladderHeight - LADDER_OFFSET_TOP) {
+                    currentY = ladderHeight - LADDER_OFFSET_TOP;
+                    startFall();
+                    return;
+                }
+
+                charEl.style.transform = `translateY(-${currentY}px)`;
+                
+                if (activeState !== 'climbing') {
+                    switchAnimation('climbing');
+                    statusEl.textContent = "Climbing...";
+                }
+
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => {
+                    if (activeState === 'climbing' && !isFalling) {
+                        startFall();
+                    }
+                }, STOP_DELAY);
+            });
+        });
+
+    </script>
 </body>
 </html>
